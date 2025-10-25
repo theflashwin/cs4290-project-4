@@ -32,6 +32,52 @@
 // TODO: Define any other data structures you need here.
 // Refer to Appendix A for details on data structures you will need here.
 
+/** CacheLine Struct */
+typedef struct CacheLine
+{
+
+    /** If Entry if valid or not */
+    bool valid;
+
+    /** If entry is dirty or not */
+    bool dirty;
+
+    /** Tag */
+    uint64_t tag;
+
+    unsigned int core_id;
+
+    unsigned long long last_access_time;
+
+
+} CacheLine;
+
+typedef struct CacheSet {
+
+    /** CacheSet Structure */
+    CacheLine cache_lines[MAX_WAYS_PER_CACHE_SET];
+
+} CacheSet;
+
+/** Possible replacement policies for the cache. */
+typedef enum ReplacementPolicyEnum
+{
+    LRU = 0,    // Evict the least recently used line.
+    RANDOM = 1, // Evict a random line.
+
+    /**
+     * Evict according to a static way partitioning policy.
+     * Part E asks you to implement this policy for extra credit.
+     */
+    SWP = 2,
+
+    /**
+     * Evict according to a dynamic way partitioning policy.
+     * Part F asks you to implement this policy for extra credit.
+     */
+    DWP = 3,
+} ReplacementPolicy;
+
 /** A single cache module. */
 typedef struct Cache
 {
@@ -90,52 +136,6 @@ typedef enum CacheResultEnum
     HIT = 1,  // The access hit the cache.
     MISS = 0, // The access missed the cache.
 } CacheResult;
-
-/** CacheLine Struct */
-typedef struct CacheLine
-{
-
-    /** If Entry if valid or not */
-    bool valid;
-
-    /** If entry is dirty or not */
-    bool dirty;
-
-    /** Tag */
-    unsigned long long tag;
-
-    unsigned int core_id;
-
-    unsigned long long last_access_time;
-
-
-} CacheLine;
-
-typedef struct CacheSet {
-
-    /** CacheSet Structure */
-    CacheLine cache_lines[MAX_WAYS_PER_CACHE_SET];
-
-} CacheSet;
-
-/** Possible replacement policies for the cache. */
-typedef enum ReplacementPolicyEnum
-{
-    LRU = 0,    // Evict the least recently used line.
-    RANDOM = 1, // Evict a random line.
-
-    /**
-     * Evict according to a static way partitioning policy.
-     * Part E asks you to implement this policy for extra credit.
-     */
-    SWP = 2,
-
-    /**
-     * Evict according to a dynamic way partitioning policy.
-     * Part F asks you to implement this policy for extra credit.
-     */
-    DWP = 3,
-} ReplacementPolicy;
 
 ///////////////////////////////////////////////////////////////////////////////
 //                            FUNCTION PROTOTYPES                            //

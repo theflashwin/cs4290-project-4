@@ -119,7 +119,9 @@ CacheResult cache_access(Cache *c, uint64_t line_addr, bool is_write,
         c->stat_read_access += 1;
     }
 
-    auto [tag, index] = get_tag_and_index(c, line_addr);
+    auto result = get_tag_and_index(c, line_addr);
+    uint64_t tag = result.first;
+    unsigned int index = (unsigned int) result.second;
 
     CacheSet *cache_set = &c->cache_sets[index];
 
@@ -168,7 +170,10 @@ void cache_install(Cache *c, uint64_t line_addr, bool is_write,
     // TODO: Initialize the victim entry with the line to install.
     // TODO: Update the appropriate cache statistics.
 
-    auto [tag, index] = get_tag_and_index(c, line_addr);
+    auto result = get_tag_and_index(c, line_addr);
+    uint64_t tag = result.first;
+    unsigned int index = (unsigned int) result.second;
+    
     CacheSet *cache_set = &c->cache_sets[index];
 
     int victim = cache_find_victim(c, index, core_id);
@@ -188,6 +193,38 @@ void cache_install(Cache *c, uint64_t line_addr, bool is_write,
 
     cache_set->cache_lines[victim] = new_cache_line;
 
+}
+
+unsigned int handle_LRU_replacenment(Cache *c, unsigned set_index, unsigned int core_id) {
+
+    // find last used
+    int last_used_idx = 0;
+    CacheSet *cache_set = &c->cache_sets[set_index];
+
+    for (unsigned int i = 0; i < c->num_ways; i++) {
+        CacheLine *cache_line = &cache_set->cache_lines[i];
+        if (!cache_line->valid)
+            return i;
+        if (cache_set->cache_lines[last_used_idx].last_access_time > cache_line->last_access_time)
+            last_used_idx = i;
+    }
+
+    return last_used_idx;
+
+}
+
+unsigned int handle_random_replacement(Cache *c, unsigned set_index, unsigned int core_id) {
+
+    CacheSet *cache_set = &c->cache_sets[set_index];
+
+    // check if there is a free line
+    for (unsigned int i = 0; i < c->num_ways; i++) {
+        if (!cache_set->cache_lines[i].valid)
+            return i;
+    }
+
+    int rand_idx = rand() % c->num_ways;
+    return rand_idx;
 }
 
 /**
@@ -225,38 +262,6 @@ unsigned int cache_find_victim(Cache *c, unsigned int set_index,
         return handle_LRU_replacenment(c, set_index, core_id);
     }
 
-}
-
-unsigned int handle_LRU_replacenment(Cache *c, unsigned set_index, unsigned int core_id) {
-
-    // find last used
-    int last_used_idx = 0;
-    CacheSet *cache_set = &c->cache_sets[set_index];
-
-    for (unsigned int i = 0; i < c->num_ways; i++) {
-        CacheLine *cache_line = &cache_set->cache_lines[i];
-        if (!cache_line->valid)
-            return i;
-        if (cache_set->cache_lines[last_used_idx].last_access_time > cache_line->last_access_time)
-            last_used_idx = i;
-    }
-
-    return last_used_idx;
-
-}
-
-unsigned int handle_random_replacement(Cache *c, unsigned set_index, unsigned int core_id) {
-
-    CacheSet *cache_set = &c->cache_sets[set_index];
-
-    // check if there is a free line
-    for (unsigned int i = 0; i < c->num_ways; i++) {
-        if (!cache_set->cache_lines[i].valid)
-            return i;
-    }
-
-    int rand_idx = rand() % c->num_ways;
-    return rand_idx;
 }
 
 /**

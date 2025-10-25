@@ -340,14 +340,14 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
                                AccessType type, unsigned int core_id)
 {
     uint64_t delay = 0;
-    uint64_t p_line_addr = 0;
+    // uint64_t p_line_addr = 0;
 
     // TODO: First convert lineaddr from virtual (v) to physical (p) using the
     //       function memsys_convert_vpn_to_pfn(). Page size is defined to be
     //       4 KB, as indicated by the PAGE_SIZE constant.
     // Note: memsys_convert_vpn_to_pfn() operates at page granularity and
     //       returns a page number.
-    p_line_addr = v_line_addr; // Replace this with a correct implementation.
+    // p_line_addr = v_line_addr; // Replace this with a correct implementation.
 
     if (type == ACCESS_TYPE_IFETCH)
     {

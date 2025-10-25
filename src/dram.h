@@ -22,6 +22,16 @@
 // TODO: Define any other data structures you need here.
 // Refer to Appendix B for details on data structures you will need here.
 
+typedef struct RowbufEntry {
+
+    /** Is the row buffer entry valid */
+    bool valid;
+
+    /** ID of the row buffer entry */
+    unsigned int row_id;
+
+} RowbufEntry;
+
 /** A DRAM module. */
 typedef struct DRAM
 {
@@ -58,16 +68,6 @@ typedef struct DRAM
     RowbufEntry row_buffer_entries[NUM_DRAM_BANKS];
 
 } DRAM;
-
-typedef struct RowbufEntry {
-
-    /** Is the row buffer entry valid */
-    bool valid;
-
-    /** ID of the row buffer entry */
-    unsigned int row_id;
-
-} RowbufEntry;
 
 /** Possible page policies for DRAM. */
 typedef enum DRAMPolicyEnum
