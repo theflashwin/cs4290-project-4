@@ -82,11 +82,11 @@ std::pair<uint64_t, uint64_t> get_tag_and_index(Cache *c, uint64_t line_addr) {
 
     uint64_t num_bits = std::log2(c->num_sets);
     uint64_t index_bitmask = (1u << num_bits) - 1;
-    uint64_t tag_bitmask = ~0u & ~index_bitmask;
+    // uint64_t tag_bitmask = ~0u & ~index_bitmask;
 
     // get the tag + index
     uint64_t index = line_addr & index_bitmask;
-    uint64_t tag = line_addr & tag_bitmask;
+    uint64_t tag = line_addr;
 
     return {tag, index};
 

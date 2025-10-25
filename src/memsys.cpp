@@ -77,7 +77,7 @@ extern unsigned int NUM_CORES;
 
 /**
  * The current clock cycle number.
- * 
+ *
  * This can be used as a timestamp for implementing the LRU replacement policy.
  */
 extern uint64_t current_cycle;
@@ -88,9 +88,9 @@ extern uint64_t current_cycle;
 
 /**
  * Allocate and initialize the memory system.
- * 
+ *
  * This is implemented for you, but you may modify it as needed.
- * 
+ *
  * @return A pointer to the memory system.
  */
 MemorySystem *memsys_new()
@@ -133,12 +133,12 @@ MemorySystem *memsys_new()
 
 /**
  * Access the given memory address from an instruction fetch or load/store.
- * 
+ *
  * Return the delay in cycles incurred by this memory access. Also update the
  * statistics accordingly.
- * 
+ *
  * This is implemented for you, but you may modify it as needed.
- * 
+ *
  * @param sys The memory system to use for the access.
  * @param addr The address to access (in bytes).
  * @param type The type of memory access.
@@ -193,12 +193,12 @@ uint64_t memsys_access(MemorySystem *sys, uint64_t addr, AccessType type,
 
 /**
  * In mode A, access the given memory address from a load or store.
- * 
+ *
  * Return the simulated delay in cycles for this memory access, which is 0
  * because timing is not simulated in this mode.
- * 
+ *
  * This is implemented for you, but you may modify it as needed.
- * 
+ *
  * @param sys The memory system to use for the access.
  * @param line_addr The address of the cache line to access (in units of the
  *                  cache line size, i.e., excluding the line offset bits).
@@ -247,13 +247,13 @@ uint64_t memsys_access_modeA(MemorySystem *sys, uint64_t line_addr,
 /**
  * In mode B or C, access the given memory address from an instruction fetch or
  * load/store.
- * 
+ *
  * Return the delay in cycles incurred by this memory access. It is intended
  * that the calling function will be responsible for updating the statistics
  * accordingly.
- * 
+ *
  * This is intended to be implemented in part B.
- * 
+ *
  * @param sys The memory system to use for the access.
  * @param line_addr The address of the cache line to access (in units of the
  *                  cache line size, i.e., excluding the line offset bits).
@@ -269,16 +269,61 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
     if (type == ACCESS_TYPE_IFETCH)
     {
         // TODO: Simulate the instruction fetch and update delay accordingly.
+        delay += ICACHE_HIT_LATENCY;
+        CacheResult result = cache_access(sys->icache, line_addr, false, core_id);
+
+        if (result == MISS)
+        {
+            delay += memsys_l2_access(sys, line_addr, false, core_id);
+            cache_install(sys->icache, line_addr, false, core_id);
+
+            if (sys->icache->last_evicted_cache_line.valid &&
+                sys->icache->last_evicted_cache_line.dirty) {
+                    sys->icache->last_evicted_cache_line.valid = false;
+                    memsys_l2_access(sys, sys->icache->last_evicted_cache_line.tag, true, core_id);
+                }
+
+        }
     }
 
     if (type == ACCESS_TYPE_LOAD)
     {
         // TODO: Simulate the data load and update delay accordingly.
+        delay += DCACHE_HIT_LATENCY;
+        CacheResult result = cache_access(sys->dcache, line_addr, false, core_id);
+
+        if (result == MISS)
+        {
+            delay += memsys_l2_access(sys, line_addr, false, core_id);
+            cache_install(sys->dcache, line_addr, false, core_id);
+
+            if (sys->dcache->last_evicted_cache_line.valid &&
+                sys->dcache->last_evicted_cache_line.dirty) {
+                    sys->dcache->last_evicted_cache_line.valid = false;
+                    memsys_l2_access(sys, sys->dcache->last_evicted_cache_line.tag, true, core_id);
+                }
+
+        }
     }
 
     if (type == ACCESS_TYPE_STORE)
     {
         // TODO: Simulate the data store and update delay accordingly.
+        delay += DCACHE_HIT_LATENCY;
+        CacheResult result = cache_access(sys->dcache, line_addr, true, core_id);
+
+        if (result == MISS)
+        {
+            delay += memsys_l2_access(sys, line_addr, false, core_id);
+            cache_install(sys->dcache, line_addr, true, core_id);
+
+            if (sys->dcache->last_evicted_cache_line.valid &&
+                sys->dcache->last_evicted_cache_line.dirty) {
+                    sys->dcache->last_evicted_cache_line.valid = false;
+                    memsys_l2_access(sys, sys->dcache->last_evicted_cache_line.tag, true, core_id);
+                }
+
+        }
     }
 
     return delay;
@@ -286,12 +331,12 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
 
 /**
  * Access the given address through the shared L2 cache.
- * 
+ *
  * Return the delay in cycles incurred by the L2 (and possibly DRAM) access.
- * 
+ *
  * This is intended to be implemented in part B and used in parts B through F
  * for icache misses, dcache misses, and dcache writebacks.
- * 
+ *
  * @param sys The memory system to use for the access.
  * @param line_addr The (physical) address of the cache line to access (in
  *                  units of the cache line size, i.e., excluding the line
@@ -306,11 +351,30 @@ uint64_t memsys_l2_access(MemorySystem *sys, uint64_t line_addr,
     uint64_t delay = L2CACHE_HIT_LATENCY;
 
     // TODO: Perform the L2 cache access.
+    CacheResult l2_result = cache_access(sys->l2cache, line_addr, is_writeback, core_id);
 
     // TODO: Use the dram_access() function to get the delay of an L2 miss.
+    if (l2_result == MISS)
+    {
+        if (!is_writeback)
+        {
+            delay += dram_access(sys->dram, line_addr, false);
+            cache_install(sys->l2cache, line_addr,false, core_id);
+        }
+        else
+        {
+            cache_install(sys->l2cache, line_addr, true, core_id);
+        }
+    }
+
     // TODO: Use the dram_access() function to perform writebacks to memory.
     //       Note that writebacks are done off the critical path.
     // This will help us track your memory reads and memory writes.
+    if (sys->l2cache->last_evicted_cache_line.valid && sys->l2cache->last_evicted_cache_line.dirty)
+    {
+        sys->l2cache->last_evicted_cache_line.valid = false;
+        dram_access(sys->dram, sys->l2cache->last_evicted_cache_line.tag, true);
+    }
 
     return delay;
 }
@@ -318,16 +382,16 @@ uint64_t memsys_l2_access(MemorySystem *sys, uint64_t line_addr,
 /**
  * In mode D, E, or F, access the given virtual address from an instruction
  * fetch or load/store.
- * 
+ *
  * Note that you will need to access the per-core icache and dcache. Also note
  * that all caches are physically indexed and physically tagged.
- * 
+ *
  * Return the delay in cycles incurred by this memory access. It is intended
  * that the calling function will be responsible for updating the statistics
  * accordingly.
- * 
+ *
  * This is intended to be implemented in part D.
- * 
+ *
  * @param sys The memory system to use for the access.
  * @param v_line_addr The virtual address of the cache line to access (in units
  *                    of the cache line size, i.e., excluding the line offset
@@ -370,12 +434,12 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
 /**
  * Convert the given virtual page number (VPN) to its corresponding physical
  * frame number (PFN; also known as physical page number, or PPN).
- * 
+ *
  * This is implemented for you and shouldn't need to be modified.
- * 
+ *
  * Note that you will need additional operations to obtain the VPN from the
  * v_line_addr and to get the physical line_addr using the PFN.
- * 
+ *
  * @param sys The memory system being used.
  * @param vpn The virtual page number to convert.
  * @param core_id The CPU core ID that requested this access.
@@ -393,9 +457,9 @@ uint64_t memsys_convert_vpn_to_pfn(MemorySystem *sys, uint64_t vpn,
 
 /**
  * Print the statistics of the memory system.
- * 
+ *
  * This is implemented for you. You must not modify its output format.
- * 
+ *
  * @param dram The memory system to print the statistics of.
  */
 void memsys_print_stats(MemorySystem *sys)
