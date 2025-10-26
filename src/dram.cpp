@@ -29,7 +29,7 @@
 
 /**
  * The DRAM bus latency, in cycles.
- * 
+ *
  * This is how long it takes for the DRAM to transmit the data via the bus. It
  * is incurred on every DRAM access. (In part B, assume that this is included
  * in the fixed DRAM latency DELAY_SIM_MODE_B.)
@@ -70,9 +70,9 @@ extern DRAMPolicy DRAM_PAGE_POLICY;
 
 /**
  * Allocate and initialize a DRAM module.
- * 
+ *
  * This is intended to be implemented in part B.
- * 
+ *
  * @return A pointer to the DRAM module.
  */
 DRAM *dram_new()
@@ -80,22 +80,21 @@ DRAM *dram_new()
     // TODO: Allocate memory to the data structures and initialize the required
     //       fields. (You might want to use calloc() for this.)
 
-    DRAM *dram = (DRAM*) calloc(1, sizeof(DRAM));
+    DRAM *dram = (DRAM *)calloc(1, sizeof(DRAM));
     return dram;
-
 }
 
 /**
  * Access the DRAM at the given cache line address.
- * 
+ *
  * Return the delay in cycles incurred by this DRAM access. Also update the
  * DRAM statistics accordingly.
- * 
+ *
  * Note that the address is given in units of the cache line size!
- * 
+ *
  * This is intended to be implemented in parts B and C. In parts C through F,
  * you may delegate logic to the dram_access_mode_CDEF() functions.
- * 
+ *
  * @param dram The DRAM module to access.
  * @param line_addr The address of the cache line to access (in units of the
  *                  cache line size).
@@ -108,32 +107,71 @@ uint64_t dram_access(DRAM *dram, uint64_t line_addr, bool is_dram_write)
     // TODO: Call the dram_access_mode_CDEF() function as needed.
     // TODO: Return the delay in cycles incurred by this DRAM access.
 
-    // int total_delay = dram_access_mode_CDEF();
-    uint64_t total_delay = DELAY_SIM_MODE_B;
+    int total_delay = dram_access_mode_CDEF(dram, line_addr, is_dram_write);
+    // uint64_t total_delay = DELAY_SIM_MODE_B;
 
-    if (is_dram_write) {
+    if (is_dram_write)
+    {
         dram->stat_write_access += 1;
         dram->stat_write_delay += total_delay;
-    } else {
+    }
+    else
+    {
         dram->stat_read_access += 1;
         dram->stat_read_delay += total_delay;
     }
 
     return total_delay;
+}
 
+uint64_t handle_open_page_policy(DRAM *dram, uint64_t line_addr, bool is_dram_write)
+{
+
+    uint64_t num_lines_per_row = ROW_BUFFER_SIZE / CACHE_LINESIZE;
+    uint64_t page_addr = line_addr / num_lines_per_row;
+
+    unsigned int row_id = page_addr / NUM_BANKS;
+    unsigned int bank_id = page_addr % NUM_BANKS;
+
+    RowbufEntry *entry = &dram->row_buffer_entries[bank_id];
+    uint64_t delay = 0;
+
+    if (!entry->valid)
+    { // empty row buffer
+        delay += DELAY_BUS + DELAY_ACT + DELAY_CAS;
+        entry->row_id = row_id;
+        entry->valid = true;
+    }
+    else if (entry->row_id == row_id)
+    { // row buffer hit
+        delay += DELAY_CAS + DELAY_BUS;
+    }
+    else
+    { // row buffer miss
+        delay += DELAY_PRE + DELAY_CAS + DELAY_ACT + DELAY_BUS;
+        entry->row_id = row_id;
+        entry->valid = true;
+    }
+
+    return delay;
+
+}
+
+uint64_t handle_close_page_policy(DRAM *dram, uint64_t line_addr, bool is_dram_write) {
+    return DELAY_ACT + DELAY_CAS + DELAY_BUS;
 }
 
 /**
  * For parts C through F, access the DRAM at the given cache line address.
- * 
+ *
  * Return the delay in cycles incurred by this DRAM access. It is intended that
  * the calling function will be responsible for updating DRAM statistics
  * accordingly.
- * 
+ *
  * Note that the address is given in units of the cache line size!
- * 
+ *
  * This is intended to be implemented in part C.
- * 
+ *
  * @param dram The DRAM module to access.
  * @param line_addr The address of the cache line to access (in units of the
  *                  cache line size).
@@ -147,14 +185,24 @@ uint64_t dram_access_mode_CDEF(DRAM *dram, uint64_t line_addr,
     // row buffers in consecutive rows.
     // TODO: Use this function to track open rows.
     // TODO: Compute the delay based on row buffer hit/miss/empty.e
-    return 0;
+
+    switch (DRAM_PAGE_POLICY)
+    {
+    case OPEN_PAGE:
+        return handle_open_page_policy(dram, line_addr, is_dram_write);
+        break;
+    default:
+        return handle_close_page_policy(dram, line_addr, is_dram_write);
+        break;
+    }
+
 }
 
 /**
  * Print the statistics of the DRAM module.
- * 
+ *
  * This is implemented for you. You must not modify its output format.
- * 
+ *
  * @param dram The DRAM module to print the statistics of.
  */
 void dram_print_stats(DRAM *dram)
