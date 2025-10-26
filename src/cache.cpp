@@ -64,11 +64,21 @@ Cache *cache_new(uint64_t size, uint64_t associativity, uint64_t line_size,
 
     Cache *cache = (Cache*) calloc(1, sizeof(Cache));
 
+    if (cache == NULL) {
+        free(cache);
+        return NULL;
+    }
+
     cache->num_sets = size / (associativity * line_size);
     cache->num_ways = associativity;
 
     // Initialize all CacheSets
     cache->cache_sets = (CacheSet*) calloc(cache->num_sets, sizeof(CacheSet));
+
+    if (cache == NULL) {
+        free(cache);
+        return NULL;
+    }
 
     // set replacement policy
     cache->replacement_policy = replacement_policy;
