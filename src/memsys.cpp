@@ -278,11 +278,11 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
             cache_install(sys->icache, line_addr, false, core_id);
 
             if (sys->icache->last_evicted_cache_line.valid &&
-                sys->icache->last_evicted_cache_line.dirty) {
-                    sys->icache->last_evicted_cache_line.valid = false;
-                    memsys_l2_access(sys, sys->icache->last_evicted_cache_line.tag, true, core_id);
-                }
-
+                sys->icache->last_evicted_cache_line.dirty)
+            {
+                sys->icache->last_evicted_cache_line.valid = false;
+                memsys_l2_access(sys, sys->icache->last_evicted_cache_line.tag, true, core_id);
+            }
         }
     }
 
@@ -298,11 +298,11 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
             cache_install(sys->dcache, line_addr, false, core_id);
 
             if (sys->dcache->last_evicted_cache_line.valid &&
-                sys->dcache->last_evicted_cache_line.dirty) {
-                    sys->dcache->last_evicted_cache_line.valid = false;
-                    memsys_l2_access(sys, sys->dcache->last_evicted_cache_line.tag, true, core_id);
-                }
-
+                sys->dcache->last_evicted_cache_line.dirty)
+            {
+                sys->dcache->last_evicted_cache_line.valid = false;
+                memsys_l2_access(sys, sys->dcache->last_evicted_cache_line.tag, true, core_id);
+            }
         }
     }
 
@@ -318,11 +318,11 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
             cache_install(sys->dcache, line_addr, true, core_id);
 
             if (sys->dcache->last_evicted_cache_line.valid &&
-                sys->dcache->last_evicted_cache_line.dirty) {
-                    sys->dcache->last_evicted_cache_line.valid = false;
-                    memsys_l2_access(sys, sys->dcache->last_evicted_cache_line.tag, true, core_id);
-                }
-
+                sys->dcache->last_evicted_cache_line.dirty)
+            {
+                sys->dcache->last_evicted_cache_line.valid = false;
+                memsys_l2_access(sys, sys->dcache->last_evicted_cache_line.tag, true, core_id);
+            }
         }
     }
 
@@ -359,7 +359,7 @@ uint64_t memsys_l2_access(MemorySystem *sys, uint64_t line_addr,
         if (!is_writeback)
         {
             delay += dram_access(sys->dram, line_addr, false);
-            cache_install(sys->l2cache, line_addr,false, core_id);
+            cache_install(sys->l2cache, line_addr, false, core_id);
         }
         else
         {
@@ -404,7 +404,7 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
                                AccessType type, unsigned int core_id)
 {
     uint64_t delay = 0;
-    // uint64_t p_line_addr = 0;
+    uint64_t p_line_addr = 0;
 
     // TODO: First convert lineaddr from virtual (v) to physical (p) using the
     //       function memsys_convert_vpn_to_pfn(). Page size is defined to be
@@ -412,20 +412,69 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
     // Note: memsys_convert_vpn_to_pfn() operates at page granularity and
     //       returns a page number.
     // p_line_addr = v_line_addr; // Replace this with a correct implementation.
+    p_line_addr = memsys_convert_vpn_to_pfn(sys, v_line_addr, core_id);
+
+    u_int64_t tag = 0;
+    uint64_t address = 0;
 
     if (type == ACCESS_TYPE_IFETCH)
     {
         // TODO: Simulate the instruction fetch and update delay accordingly.
+        delay += ICACHE_HIT_LATENCY;
+        CacheResult result = cache_access(sys->icache_coreid[core_id], p_line_addr, false, core_id);
+
+        if (result == MISS)
+        {
+
+            delay += memsys_l2_access(sys, p_line_addr, false, core_id);
+            cache_install(sys->icache_coreid[core_id], p_line_addr, false, core_id);
+
+            if (sys->icache_coreid[core_id]->last_evicted_cache_line.valid && sys->icache_coreid[core_id]->last_evicted_cache_line.dirty)
+            {
+                sys->icache_coreid[core_id]->last_evicted_cache_line.valid = false;
+                memsys_l2_access(sys, sys->icache_coreid[core_id]->last_evicted_cache_line.tag, true, core_id);
+            }
+        }
     }
 
     if (type == ACCESS_TYPE_LOAD)
     {
-        // TODO: Simulate the data load and update delay accordingly.
+
+        delay += DCACHE_HIT_LATENCY;
+        CacheResult result = cache_access(sys->dcache_coreid[core_id], p_line_addr, false, core_id);
+
+        if (result == MISS)
+        {
+            delay += memsys_l2_access(sys, p_line_addr, false, core_id);
+            cache_install(sys->dcache_coreid[core_id], p_line_addr, false, core_id);
+
+            if (sys->dcache_coreid[core_id]->last_evicted_cache_line.valid &&
+                sys->dcache_coreid[core_id]->last_evicted_cache_line.dirty)
+            {
+                sys->dcache_coreid[core_id]->last_evicted_cache_line.valid = false;
+                memsys_l2_access(sys, sys->dcache_coreid[core_id]->last_evicted_cache_line.tag, true, core_id);
+            }
+        }
     }
 
     if (type == ACCESS_TYPE_STORE)
     {
         // TODO: Simulate the data store and update delay accordingly.
+        delay += DCACHE_HIT_LATENCY;
+        CacheResult result = cache_access(sys->dcache_coreid[core_id], p_line_addr, false, core_id);
+
+        if (result == MISS)
+        {
+            delay += memsys_l2_access(sys, p_line_addr, false, core_id);
+            cache_install(sys->dcache_coreid[core_id], p_line_addr, true, core_id);
+
+            if (sys->dcache_coreid[core_id]->last_evicted_cache_line.valid &&
+                sys->dcache_coreid[core_id]->last_evicted_cache_line.dirty)
+            {
+                sys->dcache_coreid[core_id]->last_evicted_cache_line.valid = false;
+                memsys_l2_access(sys, sys->dcache_coreid[core_id]->last_evicted_cache_line.tag, true, core_id);
+            }
+        }
     }
 
     return delay;
