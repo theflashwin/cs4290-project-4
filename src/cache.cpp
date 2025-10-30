@@ -20,7 +20,7 @@
 
 /**
  * The current clock cycle number.
- * 
+ *
  * This can be used as a timestamp for implementing the LRU replacement policy.
  */
 extern uint64_t current_cycle;
@@ -28,9 +28,9 @@ extern uint64_t current_cycle;
 /**
  * For static way partitioning, the quota of ways in each set that can be
  * assigned to core 0.
- * 
+ *
  * The remaining number of ways is the quota for core 1.
- * 
+ *
  * This is used to implement extra credit part E.
  */
 extern unsigned int SWP_CORE0_WAYS;
@@ -47,7 +47,7 @@ extern unsigned int SWP_CORE0_WAYS;
 
 /**
  * Allocate and initialize a cache.
- * 
+ *
  * This is intended to be implemented in part A.
  *
  * @param size The size of the cache in bytes.
@@ -62,9 +62,10 @@ Cache *cache_new(uint64_t size, uint64_t associativity, uint64_t line_size,
     // TODO: Allocate memory to the data structures and initialize the required
     //       fields. (You might want to use calloc() for this.)
 
-    Cache *cache = (Cache*) calloc(1, sizeof(Cache));
+    Cache *cache = (Cache *)calloc(1, sizeof(Cache));
 
-    if (cache == NULL) {
+    if (cache == NULL)
+    {
         free(cache);
         return NULL;
     }
@@ -73,9 +74,10 @@ Cache *cache_new(uint64_t size, uint64_t associativity, uint64_t line_size,
     cache->num_ways = associativity;
 
     // Initialize all CacheSets
-    cache->cache_sets = (CacheSet*) calloc(cache->num_sets, sizeof(CacheSet));
+    cache->cache_sets = (CacheSet *)calloc(cache->num_sets, sizeof(CacheSet));
 
-    if (cache == NULL) {
+    if (cache->cache_sets == NULL)
+    {
         free(cache);
         return NULL;
     }
@@ -84,11 +86,10 @@ Cache *cache_new(uint64_t size, uint64_t associativity, uint64_t line_size,
     cache->replacement_policy = replacement_policy;
 
     return cache;
-
 }
 
-
-std::pair<uint64_t, uint64_t> get_tag_and_index(Cache *c, uint64_t line_addr) {
+std::pair<uint64_t, uint64_t> get_tag_and_index(Cache *c, uint64_t line_addr)
+{
 
     uint64_t num_bits = std::log2(c->num_sets);
     uint64_t index_bitmask = (1u << num_bits) - 1;
@@ -99,16 +100,15 @@ std::pair<uint64_t, uint64_t> get_tag_and_index(Cache *c, uint64_t line_addr) {
     uint64_t tag = line_addr;
 
     return {tag, index};
-
 }
 
 /**
  * Access the cache at the given address.
- * 
+ *
  * Also update the cache statistics accordingly.
- * 
+ *
  * This is intended to be implemented in part A.
- * 
+ *
  * @param c The cache to access.
  * @param line_addr The address of the cache line to access (in units of the
  *                  cache line size, i.e., excluding the line offset bits).
@@ -123,22 +123,27 @@ CacheResult cache_access(Cache *c, uint64_t line_addr, bool is_write,
     // TODO: If is_write is true, mark the resident line as dirty.
     // TODO: Update the appropriate cache statistics.
 
-    if (is_write) {
+    if (is_write)
+    {
         c->stat_write_access += 1;
-    } else {
+    }
+    else
+    {
         c->stat_read_access += 1;
     }
 
     auto result = get_tag_and_index(c, line_addr);
     uint64_t tag = result.first;
-    unsigned int index = (unsigned int) result.second;
+    unsigned int index = (unsigned int)result.second;
 
     CacheSet *cache_set = &c->cache_sets[index];
 
-    for (unsigned int i = 0; i < c->num_ways; i++) {
+    for (unsigned int i = 0; i < c->num_ways; i++)
+    {
         CacheLine *line = &cache_set->cache_lines[i];
-        if (line->valid && line->tag == tag) {
-            
+        if (line->valid && line->tag == tag && line->core_id == core_id)
+        {
+
             if (is_write)
                 line->dirty = true;
 
@@ -148,23 +153,25 @@ CacheResult cache_access(Cache *c, uint64_t line_addr, bool is_write,
         }
     }
 
-    if (is_write) {
+    if (is_write)
+    {
         c->stat_write_miss += 1;
-    } else {
+    }
+    else
+    {
         c->stat_read_miss += 1;
     }
 
     return MISS;
-
 }
 
 /**
  * Install the cache line with the given address.
- * 
+ *
  * Also update the cache statistics accordingly.
- * 
+ *
  * This is intended to be implemented in part A.
- * 
+ *
  * @param c The cache to install the line into.
  * @param line_addr The address of the cache line to install (in units of the
  *                  cache line size, i.e., excluding the line offset bits).
@@ -182,36 +189,38 @@ void cache_install(Cache *c, uint64_t line_addr, bool is_write,
 
     auto result = get_tag_and_index(c, line_addr);
     uint64_t tag = result.first;
-    unsigned int index = (unsigned int) result.second;
-    
+    unsigned int index = (unsigned int)result.second;
+
     CacheSet *cache_set = &c->cache_sets[index];
 
     int victim = cache_find_victim(c, index, core_id);
     CacheLine victim_line = cache_set->cache_lines[victim];
 
     c->last_evicted_cache_line = victim_line;
-    if (victim_line.valid && victim_line.dirty) {
+    if (victim_line.valid && victim_line.dirty)
+    {
         c->stat_dirty_evicts += 1;
     }
 
     CacheLine new_cache_line;
     new_cache_line.core_id = core_id;
     new_cache_line.valid = true;
-    new_cache_line.dirty = false;
+    new_cache_line.dirty = is_write;
     new_cache_line.last_access_time = current_cycle;
     new_cache_line.tag = tag;
 
     cache_set->cache_lines[victim] = new_cache_line;
-
 }
 
-unsigned int handle_LRU_replacenment(Cache *c, unsigned set_index, unsigned int core_id) {
+unsigned int handle_LRU_replacenment(Cache *c, unsigned set_index, unsigned int core_id)
+{
 
     // find last used
     int last_used_idx = 0;
     CacheSet *cache_set = &c->cache_sets[set_index];
 
-    for (unsigned int i = 0; i < c->num_ways; i++) {
+    for (unsigned int i = 0; i < c->num_ways; i++)
+    {
         CacheLine *cache_line = &cache_set->cache_lines[i];
         if (!cache_line->valid)
             return i;
@@ -220,15 +229,57 @@ unsigned int handle_LRU_replacenment(Cache *c, unsigned set_index, unsigned int 
     }
 
     return last_used_idx;
+}
+
+/**
+ * Static Way Partitioning Handler
+ */
+unsigned int handle_static_way_partitioning_replacement(Cache *c, unsigned set_index, unsigned int core_id)
+{
+
+    CacheSet *cache_set = &c->cache_sets[set_index];
+
+    // first, fill up all invalid ways
+    for (unsigned int i = 0; i < c->num_ways; i++)
+    {
+        if (!cache_set->cache_lines[i].valid)
+            return i;
+    }
+
+    // now, count the number of each
+    unsigned int num_core = 0;
+
+    for (unsigned int i = 0; i < c->num_ways; i++)
+    {
+        if (cache_set->cache_lines[i].core_id == core_id)
+            num_core += 1;
+    }
+
+    // find the quota
+    unsigned int quota = core_id == 0 ? SWP_CORE0_WAYS : c->num_ways - SWP_CORE0_WAYS;
+    int last_used_idx = 0;
+
+    bool use_current_core_entries = num_core >= quota;
+
+    for (unsigned int i = 0; i < c->num_ways; i++) {
+        CacheLine *cache_line = &cache_set->cache_lines[i];
+        if ((last_used_idx == -1 || cache_set->cache_lines[last_used_idx].last_access_time > cache_line->last_access_time)
+            && cache_line->core_id == (use_current_core_entries ? core_id : ((core_id + 1) % 2)))
+            last_used_idx = i;
+    }
+
+    return last_used_idx;
 
 }
 
-unsigned int handle_random_replacement(Cache *c, unsigned set_index, unsigned int core_id) {
+unsigned int handle_random_replacement(Cache *c, unsigned set_index, unsigned int core_id)
+{
 
     CacheSet *cache_set = &c->cache_sets[set_index];
 
     // check if there is a free line
-    for (unsigned int i = 0; i < c->num_ways; i++) {
+    for (unsigned int i = 0; i < c->num_ways; i++)
+    {
         if (!cache_set->cache_lines[i].valid)
             return i;
     }
@@ -241,13 +292,13 @@ unsigned int handle_random_replacement(Cache *c, unsigned set_index, unsigned in
  * Find which way in a given cache set to replace when a new cache line needs
  * to be installed. This should be chosen according to the cache's replacement
  * policy.
- * 
+ *
  * The returned victim can be valid (non-empty), in which case the calling
  * function is responsible for evicting the cache line from that victim way.
- * 
+ *
  * This is intended to be initially implemented in part A and, for extra
  * credit, extended in parts E and F.
- * 
+ *
  * @param c The cache to search.
  * @param set_index The index of the cache set to search.
  * @param core_id The CPU core ID that requested this access.
@@ -268,17 +319,18 @@ unsigned int cache_find_victim(Cache *c, unsigned int set_index,
         return handle_LRU_replacenment(c, set_index, core_id);
     case RANDOM:
         return handle_random_replacement(c, set_index, core_id);
+    case SWP:
+        return handle_static_way_partitioning_replacement(c, set_index, core_id);
     default:
         return handle_LRU_replacenment(c, set_index, core_id);
     }
-
 }
 
 /**
  * Print the statistics of the given cache.
- * 
+ *
  * This is implemented for you. You must not modify its output format.
- * 
+ *
  * @param c The cache to print the statistics of.
  * @param label A label for the cache, which is used as a prefix for each
  *              statistic.

@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cmath>
 // You may add any other #include directives you need here, but make sure they
 // compile on the reference machine!
 
@@ -363,6 +364,7 @@ uint64_t memsys_l2_access(MemorySystem *sys, uint64_t line_addr,
         }
         else
         {
+            delay += dram_access(sys->dram, line_addr, false);
             cache_install(sys->l2cache, line_addr, true, core_id);
         }
     }
@@ -412,10 +414,14 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
     // Note: memsys_convert_vpn_to_pfn() operates at page granularity and
     //       returns a page number.
     // p_line_addr = v_line_addr; // Replace this with a correct implementation.
-    p_line_addr = memsys_convert_vpn_to_pfn(sys, v_line_addr, core_id);
 
-    u_int64_t tag = 0;
-    uint64_t address = 0;
+    // calculat actual vpn
+    uint64_t vpn = v_line_addr / (PAGE_SIZE / CACHE_LINESIZE);
+    uint64_t offset = v_line_addr % (PAGE_SIZE / CACHE_LINESIZE);
+
+    uint64_t pfn = memsys_convert_vpn_to_pfn(sys, vpn, core_id);
+
+    p_line_addr = pfn * (PAGE_SIZE / CACHE_LINESIZE) + offset;
 
     if (type == ACCESS_TYPE_IFETCH)
     {
@@ -461,7 +467,7 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
     {
         // TODO: Simulate the data store and update delay accordingly.
         delay += DCACHE_HIT_LATENCY;
-        CacheResult result = cache_access(sys->dcache_coreid[core_id], p_line_addr, false, core_id);
+        CacheResult result = cache_access(sys->dcache_coreid[core_id], p_line_addr, true, core_id);
 
         if (result == MISS)
         {
